@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/sync.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/callback",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
+  "env": {
+    "SPOTIFY_CLIENT_ID": "@spotify-client-id",
+    "SPOTIFY_CLIENT_SECRET": "@spotify-client-secret",
+    "REDIRECT_URI": "@redirect-uri"
+  }
+}

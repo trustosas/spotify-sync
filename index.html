@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1DB954, #191414);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, #1DB954, #ffffff);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .account-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .account-section h3 {
+            margin-bottom: 1rem;
+            color: #1DB954;
+        }
+        
+        .auth-button {
+            background: linear-gradient(45deg, #1DB954, #1ed760);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0.5rem 0;
+        }
+        
+        .auth-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(29, 185, 84, 0.3);
+        }
+        
+        .auth-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .sync-button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            width: 100%;
+            margin-top: 1rem;
+            font-size: 1.2rem;
+            padding: 15px;
+        }
+        
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status.success {
+            background: rgba(29, 185, 84, 0.2);
+            border: 1px solid #1DB954;
+        }
+        
+        .status.error {
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+        }
+        
+        .status.info {
+            background: rgba(74, 144, 226, 0.2);
+            border: 1px solid #4a90e2;
+        }
+        
+        .connected {
+            color: #1DB954;
+            font-weight: bold;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #1DB954;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #1DB954;
+        }
+        
+        .instructions ol {
+            margin-left: 1rem;
+        }
+        
+        .instructions li {
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Spotify Sync</h1>
+        
+        <div class="instructions">
+            <h3>How to use:</h3>
+            <ol>
+                <li>Authorize both your source account (where you have liked songs)</li>
+                <li>Authorize your target account (where you want to sync songs to)</li>
+                <li>Click "Sync Liked Songs" to transfer your music</li>
+            </ol>
+        </div>
+        
+        <div class="account-section">
+            <h3>📤 Source Account (From)</h3>
+            <p>The account with liked songs you want to copy from</p>
+            <button id="authSource" class="auth-button">Authorize Source Account</button>
+            <div id="sourceStatus"></div>
+        </div>
+        
+        <div class="account-section">
+            <h3>📥 Target Account (To)</h3>
+            <p>The account where you want to add the liked songs</p>
+            <button id="authTarget" class="auth-button">Authorize Target Account</button>
+            <div id="targetStatus"></div>
+        </div>
+        
+        <button id="syncButton" class="auth-button sync-button" disabled>
+            🔄 Sync Liked Songs
+        </button>
+        
+        <div id="syncStatus"></div>
+    </div>
+
+    <script>
+        let sourceAuth = null;
+        let targetAuth = null;
+        let authUrl = '';
+        
+        // Get authorization URL on page load
+        async function getAuthUrl() {
+            try {
+                const response = await fetch('/api/sync');
+                const data = await response.json();
+                authUrl = data.authUrl;
+            } catch (error) {
+                console.error('Failed to get auth URL:', error);
+            }
+        }
+        
+        // Check if we're returning from OAuth
+        function checkOAuthReturn() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            
+            if (code) {
+                if (state === 'source') {
+                    sourceAuth = { code };
+                    document.getElementById('sourceStatus').innerHTML = '<span class="connected">✓ Source account connected</span>';
+                    document.getElementById('authSource').textContent = 'Re-authorize Source';
+                } else if (state === 'target') {
+                    targetAuth = { code };
+                    document.getElementById('targetStatus').innerHTML = '<span class="connected">✓ Target account connected</span>';
+                    document.getElementById('authTarget').textContent = 'Re-authorize Target';
+                }
+                
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                updateSyncButton();
+            }
+        }
+        
+        function updateSyncButton() {
+            const syncButton = document.getElementById('syncButton');
+            if (sourceAuth && targetAuth) {
+                syncButton.disabled = false;
+                syncButton.textContent = '🔄 Sync Liked Songs';
+            } else {
+                syncButton.disabled = true;
+                syncButton.textContent = '🔄 Authorize both accounts first';
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('authSource').addEventListener('click', () => {
+            if (authUrl) {
+                const url = authUrl + '&state=source';
+                window.location.href = url;
+            }
+        });
+        
+        document.getElementById('authTarget').addEventListener('click', () => {
+            if (authUrl) {
+                const url = authUrl + '&state=target';
+                window.location.href = url;
+            }
+        });
+        
+        document.getElementById('syncButton').addEventListener('click', async () => {
+            if (!sourceAuth || !targetAuth) return;
+            
+            const syncButton = document.getElementById('syncButton');
+            const syncStatus = document.getElementById('syncStatus');
+            
+            syncButton.disabled = true;
+            syncButton.innerHTML = '<span class="loading"></span> Syncing...';
+            
+            try {
+                const response = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sourceCode: sourceAuth.code,
+                        targetCode: targetAuth.code
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    syncStatus.innerHTML = `
+                        <div class="status success">
+                            <h4>✅ ${result.message}</h4>
+                            <p>Added ${result.added} new songs</p>
+                            <p>Source: ${result.sourceSongs} songs → Target: ${result.targetSongs} songs</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Sync failed');
+                }
+                
+            } catch (error) {
+                syncStatus.innerHTML = `
+                    <div class="status error">
+                        <h4>❌ Sync Failed</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+            
+            syncButton.disabled = false;
+            syncButton.textContent = '🔄 Sync Again';
+        });
+        
+        // Initialize
+        getAuthUrl().then(() => {
+            checkOAuthReturn();
+            updateSyncButton();
+        });
+    </script>
+</body>
+</html>

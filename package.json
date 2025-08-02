@@ -1,0 +1,20 @@
+{
+  "name": "spotify-sync",
+  "version": "1.0.0",
+  "description": "Sync liked songs between Spotify accounts",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step needed'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
